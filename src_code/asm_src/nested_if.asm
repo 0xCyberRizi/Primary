@@ -1,61 +1,61 @@
 section .data
-    value1 dd 10   ; Define the first value
-    value2 dd 20   ; Define the second value
+    v1 dd 10    ; First value
+    v2 dd 20    ; Second value
 
 section .text
-    global _start   ; Entry point for the program
+    global _start   ; Entry point
 
 _start:
-    ; Load the values into registers
-    mov eax, [value1]  ; Move the value of 'value1' into EAX
-    mov ebx, [value2]  ; Move the value of 'value2' into EBX
+    ; Load values into registers
+    mov eax, [v1]   ; Move value of 'v1' into EAX
+    mov ebx, [v2]   ; Move value of 'v2' into EBX
 
-    ; Compare the values
-    cmp eax, ebx       ; Compare the values in EAX and EBX
-    jle value1_less_than_value2  ; Jump to 'value1_less_than_value2' label if EAX is less than or equal to EBX
+    ; Compare values
+    cmp eax, ebx    ; Compare values in EAX and EBX
+    jle v1_le_v2    ; Jump if EAX is less than or equal to EBX
 
-    ; If EAX is greater than EBX, print a message and exit
-    mov eax, 4          ; Set the system call number for write (4)
-    mov ebx, 1          ; Set the file descriptor for standard output (1)
-    mov ecx, greater_than_msg  ; Move the address of the message into ECX
-    mov edx, greater_than_msg_len  ; Move the length of the message into EDX
-    int 0x80            ; Invoke the kernel to write the message to the standard output
-    jmp end_program     ; Jump to 'end_program' label to exit the program
+    ; Print message and exit if EAX > EBX
+    mov eax, 4      ; System call number for write
+    mov ebx, 1      ; File descriptor for standard output
+    mov ecx, gt_msg    ; Address of the message
+    mov edx, gt_msg_len    ; Length of the message
+    int 0x80        ; Invoke kernel to write to stdout
+    jmp end_prog    ; Jump to exit program
 
-value1_less_than_value2:
-    ; Compare if EAX is less than EBX - 5
-    sub ebx, 5          ; Subtract 5 from EBX
-    cmp eax, ebx        ; Compare the value in EAX to the value in EBX
-    jge value1_less_than_value2_print  ; Jump to 'value1_less_than_value2_print' label if EAX is greater than or equal to EBX
+v1_le_v2:
+    ; Compare if EAX < EBX - 5
+    sub ebx, 5      ; Subtract 5 from EBX
+    cmp eax, ebx    ; Compare EAX to EBX
+    jge v1_lt_v2_p  ; Jump if EAX >= EBX
 
-    ; If EAX is less than EBX - 5, print a message and exit
-    mov eax, 4          ; Set the system call number for write (4)
-    mov ebx, 1          ; Set the file descriptor for standard output (1)
-    mov ecx, value1_less_than_value2_msg  ; Move the address of the message into ECX
-    mov edx, value1_less_than_value2_msg_len  ; Move the length of the message into EDX
-    int 0x80            ; Invoke the kernel to write the message to the standard output
-    jmp end_program     ; Jump to 'end_program' label to exit the program
+    ; Print message and exit if EAX < EBX - 5
+    mov eax, 4      ; System call number for write
+    mov ebx, 1      ; File descriptor for standard output
+    mov ecx, v1_lt_v2_msg  ; Address of the message
+    mov edx, v1_lt_v2_msg_len  ; Length of the message
+    int 0x80        ; Invoke kernel to write to stdout
+    jmp end_prog    ; Jump to exit program
 
-value1_less_than_value2_print:
-    ; If EAX is less than EBX - 5, print a message and exit
-    mov eax, 4          ; Set the system call number for write (4)
-    mov ebx, 1          ; Set the file descriptor for standard output (1)
-    mov ecx, value1_less_than_value2_print_msg  ; Move the address of the message into ECX
-    mov edx, value1_less_than_value2_print_msg_len  ; Move the length of the message into EDX
-    int 0x80            ; Invoke the kernel to write the message to the standard output
+v1_lt_v2_p:
+    ; Print message if EAX < EBX - 5
+    mov eax, 4      ; System call number for write
+    mov ebx, 1      ; File descriptor for standard output
+    mov ecx, v1_lt_v2_p_msg    ; Address of the message
+    mov edx, v1_lt_v2_p_msg_len    ; Length of the message
+    int 0x80        ; Invoke kernel to write to stdout
 
-end_program:
+end_prog:
     ; Exit the program
-    mov eax, 1      ; Set the system call number for exit (1)
-    xor ebx, ebx    ; Set the exit status to 0
-    int 0x80        ; Invoke the kernel to exit the program
+    mov eax, 1      ; System call number for exit
+    xor ebx, ebx    ; Exit status
+    int 0x80        ; Invoke kernel to exit
 
 section .data
-    greater_than_msg db 'value1 is greater than value2', 0xA  ; Define a message for greater than case
-    greater_than_msg_len equ $ - greater_than_msg   ; Calculate the length of the message
+    gt_msg db 'v1 is greater than v2', 0xA    ; Message for greater than case
+    gt_msg_len equ $ - gt_msg  ; Length of the message
 
-    value1_less_than_value2_msg db 'value1 is less than value2 - 5', 0xA  ; Define a message for less than case
-    value1_less_than_value2_msg_len equ $ - value1_less_than_value2_msg   ; Calculate the length of the message
+    v1_lt_v2_msg db 'v1 is less than v2 - 5', 0xA  ; Message for less than case
+    v1_lt_v2_msg_len equ $ - v1_lt_v2_msg  ; Length of the message
 
-    value1_less_than_value2_print_msg db 'value1 is less than value2', 0xA  ; Define a message for less than case
-    value1_less_than_value2_print_msg_len equ $ - value1_less_than_value2_print_msg   ; Calculate the length of the message
+    v1_lt_v2_p_msg db 'v1 is less than v2', 0xA  ; Message for less than case
+    v1_lt_v2_p_msg_len equ $ - v1_lt_v2_p_msg  ; Length of the message
