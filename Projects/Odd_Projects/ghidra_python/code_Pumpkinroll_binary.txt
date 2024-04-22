@@ -1,0 +1,90 @@
+socket, Networking, Raw Sockets
+bind, Networking, Raw Sockets
+listen, Networking, Raw Sockets
+accept, Networking, Raw Sockets
+connect, Networking, Raw Sockets
+read, Networking, Raw Sockets
+recv, Networking, Raw Sockets
+write, Networking, Raw Sockets
+shutdown, Networking, Raw Sockets
+
+WSAStratup, Networking, WinAPI Sockets
+bind, Networking, WinAPI Sockets
+listen, Networking, WinAPI Sockets
+accept, Networking, WinAPI Sockets
+connect, Networking, WinAPI Sockets
+recv, Networking, WinAPI Sockets
+send , Networking, WinAPI Sockets
+WSACleanup, Networking WinAPI Sockets
+
+
+RegCreateKeyEx, Persistance, Registry
+RegOpenKeyExW, Persistance, Registry
+RegSetValueExW, Persistance, Registry
+RegDeleteKeyEx, Persistance, Registry
+RegGetValue, Persistance, Registry
+
+GetTempPath, Persistance, File
+CopyFile, Persistance, File
+CreateFile, Persistance, File
+WriteFile, Persistance, File
+ReadFile, Persistance, File
+
+OpenSCManager, Persistance, Service
+CreateService, Persistance, Service
+StartServiceCtrlDispatcher, Persistance, Service
+
+WinCrypt, Encryption
+CryptAcquireContext, Encryption
+CryptGenKey, Encryption
+CryptDeriveKey, Encryption
+CryptDecrypt, Encryption
+CryptReleaseContext, Encryption
+
+IsDebuggerPresent, Analysis_Avoidance/VM, Function_Name
+GetSystemInfo, Analysis_Avoidance/VM, Function_Name
+GlobalMemoryStatusEx, Analysis_Avoidance/VM, Function_Name
+GetVersion, Analysis_Avoidance/VM, Function_Name
+CreateToolhelp32Snapshot, Analysis_Avoidance/VM, Function_Name
+CreateFileW, Analysis_Avoidance/VM, Function_Name
+CreateFileA, Analysis_Avoidance/VM, Function_Name
+
+CPUID, Analysis_Avoidance/VM, Assem_Instr
+#IN, Analysis_Avoidance/VM, Assem_Instr
+
+VirtualAlloc, Stealth, Alloc memory (packers)
+VirtualProtect, Stealth,Change memory permission (packer giving execution permission to a section)
+ReadProcessMemory, Stealth, Injection into external processes
+WriteProcessMemory, Stealth, Injection into external processes
+WriteProcessMemoryA/W, Stealth
+NtWriteVirtualMemory, Stealth
+CreateRemoteThread, Stealth,DLL/Process injection...
+NtUnmapViewOfSection, Stealth,
+QueueUserAPC, Stealth
+CreateProcessInternalA/W, Stealth
+
+CreateProcessA, Execution
+CreateProcessW, Execution
+ShellExecute, Execution
+WinExec, Execution
+ResumeThread, Execution
+NtResumeThread, Execution
+
+GetAsyncKeyState, Recon, key logger
+SetWindowsHookEx, Recon, Key logger
+GetForeGroundWindow, Recon, Getting window name or website from browser
+LoadLibrary, Misc, Import Library
+GetProcAddress, Misc, Import Library
+CreateToolhelp32Snapshot, Recon, List running processes
+GetDC, Recon, screenshot
+BitBlt, Recon, screenshot
+
+
+InternetOpen, Access, to Internet
+InternetOpenUrl, Access, to Internet
+InternetReadFile, Access, to Internet
+InternetWriteFile, Access, to Internet
+
+FindResource, Access, Resources of the executable
+LoadResource, Access, Resources of the executable
+LockResource, Access, Resources of the executable
