@@ -1,6 +1,3 @@
-# Student: Anthony Rizi
-# DSU Class CSC842 Security Tool Development
-# Professor Welu
 # This program RUMMAGESAIL establishes a server-client connection and executes base64 encoded commands to decode information sent from the client.
 
 import os
