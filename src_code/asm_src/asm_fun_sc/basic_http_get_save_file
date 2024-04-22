@@ -1,0 +1,113 @@
+section .data
+    ; Define the URL for the HTTP GET request
+    url db "https://www.example.com", 0
+
+    ; Define the buffer to store the response data
+    buffer_size equ 4096  ; Size of the buffer for storing the response data
+    buffer resb buffer_size
+
+    ; Message box text strings
+    msg_http_success db "HTTP GET request succeeded!", 0
+    msg_http_failure db "HTTP GET request failed.", 0
+    msg_title db "HTTP GET Result", 0
+
+section .text
+    global _start
+
+_start:
+    ; Load the function addresses from the DLLs
+    push dword 0                 ; Set the handle to the current process (null)
+    push dword 0                 ; Set the handle to the current thread (null)
+    push dword 0                 ; Set the pointer to the thread attributes (null)
+    push dword 0                 ; Set the pointer to the security attributes (null)
+    call [InternetOpenA]         ; Call InternetOpenA function from Wininet.dll to initialize the Wininet library
+
+    ; Check if InternetOpenA succeeded
+    test eax, eax
+    jz http_failure              ; If eax is 0, InternetOpenA failed
+
+    ; Set the options for the HTTP request
+    push dword 0                 ; Set the handle to the Internet session
+    push dword 0                 ; Set the pointer to the URL cache (null)
+    push dword 0                 ; Set the pointer to the HTTP referer (null)
+    push dword 0                 ; Set the HTTP flags (0 for no flags)
+    push dword 0                 ; Set the pointer to the HTTP headers (null)
+    push dword 0                 ; Set the length of the HTTP headers (null)
+    push dword 0                 ; Set the pointer to the HTTP verb (null)
+    push dword 0                 ; Set the HTTP verb (0 for HTTP GET)
+    push dword url               ; Set the pointer to the URL
+    call [InternetOpenUrlA]      ; Call InternetOpenUrlA function from Wininet.dll to open the URL
+
+    ; Check if InternetOpenUrlA succeeded
+    test eax, eax
+    jz http_failure              ; If eax is 0, InternetOpenUrlA failed
+
+    ; Read the response data into the buffer
+    push dword 0                 ; Set the handle to the opened URL
+    push dword buffer            ; Set the pointer to the buffer to store the response
+    push dword buffer_size       ; Set the size of the buffer
+    lea ebx, [bytes_read]        ; Load the pointer to the bytes_read variable into ebx
+    call [InternetReadFile]      ; Call InternetReadFile function from Wininet.dll to read the response data
+
+    ; Check if InternetReadFile succeeded
+    test eax, eax
+    jz http_failure              ; If eax is 0, InternetReadFile failed
+
+    ; Print the response data to the console
+    mov esi, buffer              ; Set esi to point to the response data
+    call print_string            ; Call the print_string function to print the response data
+
+    ; Display a message box indicating HTTP GET success
+    push dword 0                 ; Set the handle to the owner window (null for the desktop window)
+    push dword msg_http_success  ; Set the pointer to the success message
+    push dword msg_title         ; Set the pointer to the message box title
+    push dword MB_OK + MB_ICONINFORMATION ; Set the style to display OK button and an information icon
+    call [MessageBoxA]           ; Call MessageBoxA to display the success message box
+
+    ; Exit the program
+    push dword 0
+    call [ExitProcess]
+
+http_failure:
+    ; Display a message box indicating HTTP GET failure
+    push dword 0                 ; Set the handle to the owner window (null for the desktop window)
+    push dword msg_http_failure  ; Set the pointer to the failure message
+    push dword msg_title         ; Set the pointer to the message box title
+    push dword MB_OK + MB_ICONERROR ; Set the style to display OK button and an error icon
+    call [MessageBoxA]           ; Call MessageBoxA to display the failure message box
+
+    ; Exit the program
+    push dword 0
+    call [ExitProcess]
+
+; Function to print a null-terminated string to the console
+; Input:
+;   esi: Pointer to the null-terminated string to be printed
+print_string:
+    mov eax, 0x0E   ; Function number for BIOS teletype output
+    mov ebx, 0x00   ; Page number (0 for current page)
+    xor ecx, ecx    ; Start from the first character of the string
+.loop:
+    lodsb           ; Load the next character from the string to al and increment esi
+    test al, al     ; Check if it is the null terminator (end of string)
+    jz .done        ; If null terminator, we are done
+    int 0x10        ; BIOS interrupt to display the character in al
+    jmp .loop       ; Continue printing the next character
+.done:
+    ret             ; Return from the function
+
+section .idata
+    ; Import table for functions from DLLs
+    import kernel32, ExitProcess, 'ExitProcess'
+    import wininet, InternetOpenA, 'InternetOpenA'
+    import wininet, InternetOpenUrlA, 'InternetOpenUrlA'
+    import wininet, InternetReadFile, 'InternetReadFile'
+
+section .data
+    ; Constants for message box styles
+    MB_OK equ 0x00000000
+    MB_ICONERROR equ 0x00000010
+    MB_ICONINFORMATION equ 0x00000040
+
+section .bss
+    bytes_read resd 1   ; Reserve space to store the number of bytes read in the response

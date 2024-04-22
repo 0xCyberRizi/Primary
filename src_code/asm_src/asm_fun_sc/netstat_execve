@@ -1,0 +1,42 @@
+section .data
+    cmd db "netstat", "-ano", 0     ; Command to be executed and its arguments
+    cmd_len equ $ - cmd             ; Length of the command string
+    buf_size equ 8192               ; Buffer size to store the output (adjust as needed)
+    buf resb buf_size               ; Reserve buffer space
+
+section .text
+    global _start                  ; Entry point for the program
+
+_start:
+    ; Call the system call for 'execve' to run the 'netstat' command
+    mov eax, 11                     ; Syscall number 11 for execve
+    mov ebx, cmd                    ; Pointer to the command to execute (netstat)
+    mov ecx, 0                      ; Command-line arguments (in this case, none)
+    mov edx, 0                      ; Environment variables (in this case, none)
+    int 0x80                        ; Call the kernel
+
+    ; Check if the 'execve' syscall succeeded
+    test eax, eax
+    js error_exit                   ; If negative, an error occurred
+
+    ; Call the system call for 'waitpid' to wait for the child process (netstat) to finish
+    mov eax, 7                      ; Syscall number 7 for waitpid
+    mov ebx, -1                     ; Wait for any child process
+    mov ecx, 0                      ; Pointer to store the status of the child process (unused here)
+    mov edx, 0                      ; Options (unused here)
+    int 0x80                        ; Call the kernel
+
+    ; Exit the program
+    mov eax, 1                      ; Syscall number 1 for exit
+    xor ebx, ebx                    ; Exit code 0
+    int 0x80                        ; Call the kernel
+
+error_exit:
+    ; An error occurred in the 'execve' syscall
+    ; You can add error handling here, if desired.
+    ; For simplicity, this example does not include detailed error handling.
+
+    ; Exit the program with a non-zero exit code to indicate an error
+    mov eax, 1                      ; Syscall number 1 for exit
+    mov ebx, 1                      ; Exit code 1 (or any desired non-zero code)
+    int 0x80                        ; Call the kernel

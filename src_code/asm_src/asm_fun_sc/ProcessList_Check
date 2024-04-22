@@ -1,0 +1,147 @@
+section .data
+    desired_process_names db "notepad.exe", 0, "chrome.exe", 0  ; Replace with the desired process names, each terminated with NULL (0)
+    num_desired_processes equ ($ - desired_process_names) / 2
+
+section .text
+    global _start
+
+extern CreateToolhelp32Snapshot, Process32First, Process32Next, GetProcessImageFileNameA, printf, ExitProcess
+extern CloseHandle
+
+_start:
+    ; Call the GetProcessList function to retrieve the list of processes
+    ; The function returns the handle to the process list in eax
+    call GetProcessList
+    test eax, eax
+    js error_exit
+    mov ebx, eax      ; Save the handle to the process list in ebx
+
+    ; Pointer to the array of desired process names
+    lea ecx, [desired_process_names]
+
+    ; Loop through each desired process name in the array
+next_desired_process:
+    ; Check if the current desired process name is NULL (end of the array)
+    cmp byte [ecx], 0
+    je end_program    ; If it is NULL, jump to the end of the program
+
+    ; Loop through the list of processes and check their names
+    ; until the current desired process name is found
+    mov esi, ecx      ; esi points to the current desired process name
+    call loop_processes
+
+    ; Move to the next desired process name in the array
+    add ecx, 32       ; Assuming each process name is no longer than 32 characters, adjust the pointer to the next desired process name
+    jmp next_desired_process
+
+loop_processes:
+    ; Get the name of the current process
+    ; The function returns the length of the process name (including NULL-terminator) in eax
+    push ebx                  ; Push the handle to the process list
+    call GetProcessName
+    add esp, 4                 ; Clean up the stack
+
+    ; Compare the current process name with the desired process name
+    mov edi, [esi]            ; edi points to the current desired process name
+    mov esi, process_name     ; esi points to the current process name
+compare_names:
+    lodsb                     ; Load the next byte from esi (current process name)
+    cmp al, byte [edi]        ; Compare with the corresponding byte from edi (desired process name)
+    jnz next_process          ; Jump to next_process if not equal (names do not match)
+    cmp al, 0                 ; Check if the current byte is NULL (end of both strings)
+    je found_process          ; Jump to found_process if both strings have ended (names match)
+    jmp compare_names         ; Repeat the comparison for the next byte
+
+next_process:
+    ; Move to the next process in the list
+    push ebx                  ; Push the handle to the process list
+    call NextProcess
+    test eax, eax
+    jnz loop_processes        ; Jump back to loop_processes if there's another process
+
+not_found:
+    ; Print "Process not found" message
+    mov eax, not_found_msg
+    call print_string
+    jmp end_program
+
+found_process:
+    ; Print "Process found" message
+    mov eax, found_msg
+    call print_string
+    jmp end_program
+
+error_exit:
+    ; Print "Error occurred" message
+    mov eax, error_msg
+    call print_string
+
+end_program:
+    ; Close the handle to the process list
+    push ebx
+    call CloseHandle
+    ; Exit the program
+    mov eax, 1                ; System call number for sys_exit
+    xor ebx, ebx              ; Exit code 0
+    int 0x80                  ; Invoke the system call
+
+section .bss
+    process_name rb 256       ; Buffer to store the process name
+
+section .data
+    found_msg db "Process found.", 0
+    not_found_msg db "Process not found.", 0
+    error_msg db "Error occurred.", 0
+
+; Function to retrieve the list of processes
+; Input: None
+; Output: eax = handle to the process list
+GetProcessList:
+    ; Call CreateToolhelp32Snapshot to retrieve the list of processes
+    ; The function returns the handle to the process list in eax
+    ; The list can be obtained using CreateToolhelp32Snapshot and Process32First/Process32Next
+    mov eax, 0x18         ; 0x18 corresponds to TH32CS_SNAPPROCESS flag for CreateToolhelp32Snapshot
+    xor ebx, ebx          ; Set ebx to 0 (current process ID) for snapshot
+    call CreateToolhelp32Snapshot
+    ret
+
+; Function to retrieve the name of the current process in the list
+; Input: ebx = handle to the process list
+; Output: eax = length of the process name (including NULL-terminator)
+GetProcessName:
+    ; Call Process32First to get the first process in the list
+    ; The function returns 1 in eax if successful, 0 if no process is found
+    mov eax, 0x4       ; 0x4 corresponds to TH32CS_SNAPMODULE flag for Process32First
+    mov ecx, ebx       ; Load the handle to the process list into ecx
+    xor edx, edx       ; Clear edx for the MODULEENTRY32 structure
+    lea edi, [esp+4]   ; Load the pointer to the buffer (process_name) into edi
+    call Process32First
+    test eax, eax
+    jz no_process_found ; If no process is found, jump to no_process_found
+
+    ; Call GetProcessImageFileNameA to retrieve the name of the current process
+    ; The function returns the length of the process name (including NULL-terminator) in eax
+    xor ecx, ecx
+    lea edi, [esp+4]   ; Load the pointer to the buffer (process_name) into edi
+    mov eax, 260       ; Maximum length of the process name
+    call GetProcessImageFileNameA
+    test eax, eax
+    jnz process_name_found ; If the name is found, jump to process_name_found
+
+no_process_found:
+    ; Return 0 if no process is found
+    xor eax, eax
+    ret
+
+process_name_found:
+    ; Return the length of the process name (including NULL-terminator) in eax
+    ret
+
+; Function to move to the next process in the list
+; Input: ebx = handle to the process list
+; Output: eax = 1 if there's another process, 0 if the list is complete
+NextProcess:
+    ; Call Process32Next to move to the next process in the list
+    ; The function returns 1 in eax if there's another process, or 0 if the list is complete
+    mov eax, 0x8       ; 0x8 corresponds to TH32CS_SNAPMODULE flag for Process32Next
+    mov ecx, ebx       ; Load the handle

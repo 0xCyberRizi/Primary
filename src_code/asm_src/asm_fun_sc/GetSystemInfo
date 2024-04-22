@@ -1,0 +1,119 @@
+;nasm -f win32 system_info.asm -o system_info.obj
+;gcc -m32 -o system_info.exe system_info.obj -lmsvcrt
+
+section .data
+  file_path db "system_info.txt", 0   ; File path to save the system information
+  file_mode db "w", 0                 ; File open mode ("w" for write)
+  sys_info db "System Information:", 0; String to store system information
+  sys_info_nl db 13, 10, 0            ; Newline characters for formatting
+
+section .bss
+  sys_info_struct resb 36             ; Buffer to store the SYSTEM_INFO structure
+  file_handle resq 1                  ; File handle
+
+section .text
+  extern GetSystemInfo, CreateFileA, WriteFile, CloseHandle, ExitProcess
+
+global _start
+
+_start:
+  ; Call GetSystemInfo to retrieve system information
+  lea ebx, [sys_info_struct]    ; Load the address of the buffer to store the SYSTEM_INFO
+  call GetSystemInfo            ; Call GetSystemInfo to retrieve system information
+
+  ; Open the file for writing
+  push 0                         ; Push lpSecurityAttributes (NULL)
+  push 2                         ; Push dwShareMode (FILE_SHARE_READ)
+  push 0                         ; Push lpSecurityAttributes (NULL)
+  push 2                         ; Push dwCreationDisposition (CREATE_ALWAYS)
+  push 0                         ; Push dwFlagsAndAttributes (not used)
+  push file_mode                 ; Push the address of the file open mode ("w" for write)
+  push file_path                 ; Push the address of the file path
+  call CreateFileA               ; Call CreateFileA to open the file for writing
+
+  ; Check if file open was successful (file handle is not INVALID_HANDLE_VALUE)
+  cmp eax, -1                    ; Compare eax (file handle) with INVALID_HANDLE_VALUE (-1)
+  je file_open_failed            ; If the file open failed, jump to file_open_failed
+  mov [file_handle], rax         ; Store the file handle for later use
+
+  ; Write system information to the file
+  ; Convert integer values to ASCII and write to the file
+  mov eax, [sys_info_struct + 12] ; Load the dwPageSize from the SYSTEM_INFO structure
+  call write_integer_to_file
+  call write_newline_to_file
+
+  mov eax, [sys_info_struct + 20] ; Load the dwNumberOfProcessors from the SYSTEM_INFO structure
+  call write_integer_to_file
+  call write_newline_to_file
+
+  ; Write the system information string to the file
+  lea rdx, [sys_info]            ; Load the address of the system information string
+  call write_string_to_file
+
+  ; Close the file
+  mov rcx, [file_handle]         ; Load the file handle
+  call CloseHandle               ; Call CloseHandle to close the file
+
+  ; Exit the program
+  xor ecx, ecx                   ; Set the exit code to 0 (successful_exit)
+  call ExitProcess               ; Call ExitProcess to terminate the program
+
+file_open_failed:
+  ; File open failed, handle the error (for example, print an error message)
+
+  ; Exit the program
+  xor ecx, ecx                   ; Set the exit code to 1 (indicating error_exit)
+  call ExitProcess               ; Call ExitProcess to terminate the program
+
+; Function to write an integer value to the file
+write_integer_to_file:
+  push rax                       ; Save the value of rax (integer to be converted)
+  push rdx                       ; Save the value of rdx
+  mov rcx, 10                    ; Set rcx to 10 (base 10)
+  xor rdx, rdx                   ; Clear rdx (upper 64 bits for 64-bit division)
+  div rcx                        ; Divide rax by 10, quotient in rax, remainder in rdx
+  test rax, rax                  ; Check if quotient is zero
+  jz .end_write_integer          ; If quotient is zero, jump to the end
+  push rax                       ; Push the quotient (next value to convert)
+  call write_integer_to_file     ; Recursive call to write the next value
+  pop rax                        ; Pop the current quotient from the stack
+.end_write_integer:
+  add dl, '0'                    ; Convert remainder to ASCII character
+  mov [rsp], dl                  ; Store the ASCII character on the stack
+  add rsp, 1                     ; Adjust the stack pointer
+  call write_char_to_file        ; Call the write_char_to_file function to write the ASCII character to the file
+  pop rdx                        ; Restore the value of rdx
+  pop rax                        ; Restore the original value of rax
+  ret
+
+; Function to write a newline to the file
+write_newline_to_file:
+  lea rdx, [sys_info_nl]         ; Load the address of the newline string
+  call write_string_to_file      ; Call the write_string_to_file function to write the newline to the file
+  ret
+
+; Function to write a null-terminated string to the file
+write_string_to_file:
+  push rdi                       ; Save the registers
+  xor rcx, rcx                   ; Clear rcx (counter for the number of characters to write)
+.loop_write_string:
+  mov al, [rdx + rcx]           ; Load the current character from the string
+  test al, al                   ; Check if the character is null (end of the string)
+  jz .end_write_string          ; If null, jump to the end
+  call write_char_to_file       ; Call the write_char_to_file function to write the character to the file
+  inc rcx                       ; Increment the character counter
+  jmp .loop_write_string        ; Continue looping
+.end_write_string:
+  pop rdi                        ; Restore the registers
+  ret
+
+; Function to write a single character to the file
+write_char_to_file:
+  ; WriteFile(file_handle, buffer, number_of_bytes_to_write, bytes_written, overlapped) -> eax = non-zero if successful
+  mov rsi, rdx                  ; Move the character to rsi (buffer)
+  mov rdx, 1                    ; Set the number of bytes to write (1)
+  lea r8, [rsp]                 ; Set the address of bytes_written (not used, can be NULL)
+  xor r9, r9                    ; Set the address of overlapped (NULL)
+  mov rcx, [file_handle]        ; Load the file handle
+  call WriteFile                ; Call WriteFile to write the character to the file
+  ret

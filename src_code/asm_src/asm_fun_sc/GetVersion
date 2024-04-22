@@ -1,0 +1,60 @@
+section .data
+  file_path db "version_info.txt", 0   ; File path to save the version information
+  file_mode db "w", 0                  ; File open mode ("w" for write)
+  version_info db "Version Information:", 0  ; String to store version information
+
+section .bss
+  os_version resd 1                    ; Variable to store the OS version information
+
+section .text
+  global _start
+
+extern GetVersion, fopen, fprintf, fclose
+
+_start:
+  ; Call GetVersion to retrieve the OS version information
+  ; GetVersion() -> eax = OS version information in the format: major_version (8 bits) | minor_version (8 bits) | build_number (16 bits)
+  call GetVersion            ; Call GetVersion to retrieve the OS version information
+  mov [os_version], eax      ; Save the result (OS version information) in the os_version variable
+
+  ; Open the file for writing
+  ; fopen(filename, mode) -> eax = file pointer or NULL if failed
+  lea eax, [file_path]         ; Load the address of the file path
+  lea ebx, [file_mode]         ; Load the address of the file open mode ("w" for write)
+  call fopen                   ; Call fopen to open the file for writing
+
+  ; Check if file open was successful (file pointer is not NULL)
+  test eax, eax                ; Check if eax (file pointer) is zero (NULL)
+  jz file_open_failed         ; If the file open failed, jump to file_open_failed
+
+  ; Write version information to the file
+  ; fprintf(file_pointer, format_string, arguments) -> eax = number of characters written
+  lea eax, [version_info]      ; Load the address of the version information string
+  push eax                     ; Push the address of the format string as an argument to fprintf
+  movzx eax, byte [os_version] ; Load the major version (8 bits) from os_version variable
+  push eax                     ; Push the major version as an argument to fprintf
+  movzx eax, byte [os_version + 1] ; Load the minor version (8 bits) from os_version variable
+  push eax                     ; Push the minor version as an argument to fprintf
+  movzx eax, word [os_version + 2] ; Load the build number (16 bits) from os_version variable
+  push eax                     ; Push the build number as an argument to fprintf
+  lea eax, [file_path]         ; Load the address of the file path
+  push eax                     ; Push the address of the file path as an argument to fprintf
+  call fprintf                 ; Call fprintf to write version information to the file
+
+  ; Close the file
+  ; fclose(file_pointer) -> eax = 0 if successful
+  pop eax                      ; Pop the file pointer from the stack
+  call fclose                  ; Call fclose to close the file
+
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax                 ; Zero out eax
+  int 0x80                     ; syscall
+
+file_open_failed:
+  ; File open failed, handle the error (for example, print an error message)
+
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax                 ; Zero out eax
+  int 0x80                     ; syscall

@@ -1,0 +1,160 @@
+section .data
+    icmp_timeout_msg db "Timeout", 0
+    max_hops equ 30
+    dest_ip db 8, 8, 8, 8      ; Destination IP address (8.8.8.8)
+
+section .text
+    global _start
+
+extern inet_addr, WSAGetLastError, socket, closesocket, htons, htonl
+extern recvfrom, sendto, printf, ExitProcess, gethostbyname
+extern WSACleanup, WSAGetLastError, WSAStartup
+
+_start:
+    ; Initialize Winsock
+    call init_winsock
+
+    ; Create a socket for sending ICMP packets
+    call create_socket
+    mov ebx, eax   ; Save the socket descriptor in ebx
+
+    ; Set the destination IP address
+    mov ecx, dest_ip
+
+    ; Perform traceroute-like operation with a maximum of 'max_hops' hops
+    xor edx, edx   ; Initialize the hop counter to 0
+
+traceroute_loop:
+    ; Check if the maximum number of hops is reached
+    cmp edx, max_hops
+    jge traceroute_done
+
+    ; Send an ICMP Echo Request packet
+    push edx       ; Push the hop counter as the TTL value for the packet
+    call send_icmp_echo_request
+    add esp, 4
+
+    ; Receive the ICMP Echo Reply or Timeout
+    call recv_icmp_echo_reply
+    test eax, eax
+    jnz icmp_timeout
+
+    ; Print the hop number and the IP address of the intermediate router
+    push eax       ; Push the IP address returned from recv_icmp_echo_reply
+    push edx       ; Push the hop counter for printf
+    call print_hop_info
+    add esp, 8
+
+    ; Increment the hop counter
+    inc edx
+
+    ; Jump back to traceroute_loop
+    jmp traceroute_loop
+
+icmp_timeout:
+    ; Print "Timeout" message for the current hop
+    mov eax, icmp_timeout_msg
+    call print_string
+
+traceroute_done:
+    ; Cleanup and exit
+    call cleanup
+    jmp end_program
+
+init_winsock:
+    ; Initialize Winsock (Windows Sockets)
+    push 0x202        ; Version 2.2
+    call WSAStartup
+    test eax, eax
+    jnz init_failed   ; Jump to init_failed if WSAStartup failed
+    ret
+
+init_failed:
+    ; Print "Winsock initialization failed" message and exit
+    mov eax, init_failed_msg
+    call print_string
+    jmp end_program
+
+create_socket:
+    ; Create a socket for sending ICMP packets
+    push 2            ; AF_INET (IPv4)
+    push 2            ; SOCK_DGRAM (UDP)
+    push 0            ; IPPROTO_IP (IP protocol)
+    call socket
+    ret
+
+send_icmp_echo_request:
+    ; Send an ICMP Echo Request packet to the destination IP
+    ; Input: eax = socket descriptor
+    ;        ebx = TTL value for the packet
+    ;        ecx = destination IP address
+    ; Output: Zero on success, non-zero on error
+    pusha
+
+    ; Prepare the ICMP Echo Request packet
+    mov eax, 0       ; Clear eax for checksum calculation
+    mov al, 8        ; ICMP Echo Request type
+    mov byte [esp+8], 0  ; ICMP Echo Request code
+    mov word [esp+9], 0  ; Clear the checksum field
+    mov word [esp+11], ebx ; TTL value
+    mov dword [esp+12], ecx ; Destination IP address
+    push 8           ; Packet size
+    lea edi, [esp+8] ; Packet buffer address
+    call calc_checksum
+    mov word [esp+9], ax ; Set the calculated checksum
+
+    ; Send the ICMP Echo Request packet
+    push 0           ; No flags
+    push 0           ; Empty destination address (we're using sendto)
+    push 0           ; Empty source address (we're using sendto)
+    push 0           ; No flags
+    push edi         ; Packet buffer address
+    push 8           ; Packet size
+    push ebx         ; Socket descriptor
+    call sendto
+    test eax, eax
+    jnz send_failed
+
+    popa
+    xor eax, eax     ; Return 0 for success
+    ret
+
+send_failed:
+    popa
+    mov eax, WSAGetLastError
+    ret
+
+recv_icmp_echo_reply:
+    ; Receive an ICMP Echo Reply or Timeout
+    ; Output: Zero if ICMP Echo Reply received, non-zero for Timeout
+    pusha
+    push icmp_reply_buffer_size ; Buffer size
+    lea edi, icmp_reply_buffer
+    push edi            ; Receive buffer address
+    push icmp_reply_flags ; Flags
+    push ebx            ; Socket descriptor
+    call recvfrom
+    test eax, eax
+    jnz recv_failed
+
+    popa
+    xor eax, eax     ; Return 0 for success
+    ret
+
+recv_failed:
+    popa
+    mov eax, WSAGetLastError
+    ret
+
+print_hop_info:
+    ; Print the hop number and the IP address of the intermediate router
+    ; Input: eax = IP address (in network byte order)
+    ;        ebx = hop number
+    ; Output: None
+    pusha
+
+    ; Print the hop number
+    push ebx
+    push hop_number_msg
+    call printf
+    add esp, 8

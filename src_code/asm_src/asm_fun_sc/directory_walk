@@ -1,0 +1,184 @@
+section .data
+    target_directory db "C:\Users\YourUsername\Documents\", 0   ; Replace with the target directory you want to walk
+
+section .bss
+    handle dd 0        ; Handle for FindFirstFile and FindNextFile
+    find_data resd 4   ; WIN32_FIND_DATA structure to store file/directory information
+    filename_buffer resb 256  ; Buffer to store the generated filename
+
+section .text
+    global _start
+
+extern FindFirstFileA, FindNextFileA, CreateFileA, WriteFile, CloseHandle, ExitProcess, printf, GetLastError
+extern GetLocalTime
+
+_start:
+    ; Initialize the handle to zero
+    mov [handle], 0
+
+    ; Generate the output filename with the current date and time
+    call generate_filename
+
+    ; Open the output file for writing
+    push 0x80000000        ; GENERIC_WRITE
+    push 0                 ; No sharing
+    push 0                 ; No security attributes
+    push 2                 ; OPEN_EXISTING
+    push 0                 ; No template file
+    push filename_buffer
+    call CreateFileA
+    cmp eax, -1            ; Check if file opening is successful
+    je file_open_failed
+
+    ; Save the file handle in edi for WriteFile
+    mov edi, eax
+
+    ; Call the function to perform the directory walk
+    push target_directory
+    call directory_walk
+
+    ; Close the output file
+    push edi
+    call CloseHandle
+
+    ; Exit the program
+    call ExitProcess
+
+directory_walk:
+    ; Function to perform the directory walk
+    ; Input: edx = pointer to the target directory path (null-terminated)
+    ; Output: None
+    push ebp
+    mov ebp, esp
+
+    ; Find the first file/directory in the target directory
+    lea ebx, [ebp-8]      ; Allocate space on the stack for the find_data structure
+    push ebx              ; Pointer to the find_data structure
+    push edx              ; Target directory path
+    call FindFirstFileA
+    test eax, eax
+    jz done_directory_walk  ; Jump to done_directory_walk if FindFirstFileA fails
+    mov [handle], eax     ; Save the handle to the find_data structure in the global variable
+
+process_file:
+    ; Process the file/directory entry
+    lea ebx, [ebp-8]
+    push ebx              ; Pointer to the find_data structure
+    call print_entry_name
+
+    ; Find the next file/directory in the target directory
+    lea ebx, [ebp-8]
+    push ebx              ; Pointer to the find_data structure
+    push dword [handle]   ; Handle to the find_data structure
+    call FindNextFileA
+    test eax, eax
+    jnz process_file      ; Jump to process_file if FindNextFileA succeeds
+    jmp done_directory_walk
+
+print_entry_name:
+    ; Print the file/directory name to the output file
+    ; Input: eax = pointer to the WIN32_FIND_DATA structure
+    ; Output: None
+    mov ebx, eax          ; Copy the pointer to ebx
+    add ebx, 0x2c         ; Move ebx to the cFileName field of WIN32_FIND_DATA
+    push 0                ; Null-terminate the string
+.next_char:
+    lodsb                ; Load the next character from [ebx] to al
+    test al, al
+    jz end_string
+    cmp al, '\\'         ; Check for backslash (directory separator)
+    je skip_entry_name
+    push eax             ; Push the character to be printed
+    push edi             ; Push the file handle
+    call WriteFile
+    add esp, 8           ; Clean up the stack
+    jmp .next_char
+
+skip_entry_name:
+    inc ebx              ; Skip the current entry's name
+    jmp .next_char
+
+end_string:
+    ret
+
+done_directory_walk:
+    pop ebp
+    ret
+
+generate_filename:
+    ; Function to generate the filename with the current date and time
+    ; Output: None
+    push ebp
+    mov ebp, esp
+
+    ; Get the current local time
+    lea ebx, [ebp-8]      ; Allocate space on the stack for SYSTEMTIME structure
+    call GetLocalTime
+
+    ; Format the filename as "output_YYYYMMDD_HHMMSS.txt"
+    mov eax, filename_buffer
+    movzx ecx, word [ebp-6] ; Year
+    call format_two_digits
+    add eax, 4
+    movzx ecx, word [ebp-4] ; Month
+    call format_two_digits
+    add eax, 2
+    movzx ecx, word [ebp-2] ; Day
+    call format_two_digits
+    add eax, 2
+    mov byte [eax], '_'
+    add eax, 1
+    movzx ecx, word [ebp]   ; Hour
+    call format_two_digits
+    add eax, 2
+    movzx ecx, word [ebp+2] ; Minute
+    call format_two_digits
+    add eax, 2
+    movzx ecx, word [ebp+4] ; Second
+    call format_two_digits
+    add eax, 2
+    mov byte [eax], '.'
+    add eax, 1
+    mov dword [eax], "txt", 0
+
+    ret
+
+format_two_digits:
+    ; Function to format two digits of a number (0-99) as two ASCII characters
+    ; Input: eax = the number (0-99)
+    ; Output: None, result stored in the filename_buffer
+    push eax
+    mov ecx, 10
+    div ecx               ; Divide the number by 10, quotient in edx (tens digit), remainder in eax (ones digit)
+    add edx, '0'          ; Convert tens digit to ASCII
+    mov [ebx], dl         ; Store tens digit in filename_buffer
+    inc ebx
+    add eax, '0'          ; Convert ones digit to ASCII
+    mov [ebx], al         ; Store ones digit in filename_buffer
+    pop eax
+    ret
+
+file_open_failed:
+    ; Print "Failed to open the output file" message and exit
+    mov eax, file_open_failed_msg
+    call print_string
+    jmp exit_program
+
+print_string:
+    ; Print a null-terminated string
+    ; Input: eax = pointer to the null-terminated string
+    ; Output: None
+    push eax
+    call printf
+    add esp, 4
+    ret
+
+exit_program:
+    ; Exit the program
+    call ExitProcess
+
+section .data
+    file_open_failed_msg db "Failed to open the output file.", 0
+
+section .text
+    global _start

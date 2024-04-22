@@ -1,0 +1,50 @@
+section .data
+
+section .bss
+  is_debugger_present resd 1 ; Variable to hold the result of IsDebuggerPresent
+
+section .text
+  global _start
+
+_start:
+  ; Call the IsDebuggerPresent function
+  ; IsDebuggerPresent() -> eax = is_debugger_present (1 if a debugger is present, 0 otherwise)
+  xor eax, eax        ; Clear eax before use
+  call check_debugger ; Call the check_debugger subroutine
+  mov [is_debugger_present], eax
+
+  ; Check the result (1 if a debugger is present, 0 otherwise)
+  cmp dword [is_debugger_present], 1
+  je debugger_present ; Jump to debugger_present if a debugger is present
+  ; If no debugger is present, you can add code here to handle this case
+
+  ; If we reach here, no debugger is present
+  ; You can add code here to handle this case
+
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax        ; Zero out eax
+  int 0x80            ; syscall
+
+debugger_present:
+  ; Debugger is present
+  ; You can add code here to handle this case
+
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax        ; Zero out eax
+  int 0x80            ; syscall
+
+check_debugger:
+  ; Function prologue (save registers on the stack)
+  push eax
+  push ebx
+
+  ; Call the IsDebuggerPresent function
+  mov eax, 0x2d       ; IsDebuggerPresent syscall number (29 in decimal)
+  int 0x80            ; syscall
+
+  ; Function epilogue (restore registers and return)
+  pop ebx
+  pop eax
+  ret

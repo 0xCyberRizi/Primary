@@ -1,0 +1,42 @@
+section .data
+  target_process_id dd 1234      ; Replace with the target process ID
+  payload_code db 90, 90, 90, ...; Replace with your assembly code
+  payload_size equ $ - payload_code
+
+section .text
+  global _start
+
+_start:
+  ; Step 1: Open the target process
+  push 0x0400          ; PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ
+  push 0               ; FALSE (bInheritHandle)
+  push target_process_id ; Replace with the target process ID
+  call [OpenProcess]   ; Call OpenProcess to get the handle to the target process
+  ; Check for error and store the handle in a register
+
+  ; Step 2: Allocate memory in the target process
+  ; Push arguments for VirtualAllocEx
+  ; Call VirtualAllocEx to allocate memory in the target process
+  ; Check for error and store the allocated memory address in a register
+
+  ; Step 3: Write your payload to the target process
+  ; Push arguments for WriteProcessMemory
+  ; Call WriteProcessMemory to write your payload to the allocated memory
+  ; Check for error
+
+  ; Step 4: Find the address of LoadLibraryA (if required)
+
+  ; Step 5: Call CreateRemoteThread
+  ; Push arguments for CreateRemoteThread
+  ; Call CreateRemoteThread to create a remote thread in the target process
+  ; Check for error and store the handle to the remote thread in a register
+
+  ; Step 6: Wait for the remote thread to complete (optional)
+
+  ; Step 7: Clean up resources
+  ; Release allocated resources, close handles, etc.
+
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax          ; Zero out eax
+  int 0x80              ; syscall

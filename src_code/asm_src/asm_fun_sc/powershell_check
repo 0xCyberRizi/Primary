@@ -1,0 +1,83 @@
+section .data
+  ; Define the registry key and value to check
+  reg_key db "SOFTWARE\Microsoft\PowerShell\1", 0 ; Registry key path
+  reg_value db "Install", 0                     ; Registry value name
+
+section .bss
+  ; Define variables to hold the result of registry access
+  hkey resd 1         ; Handle to the opened registry key
+  reg_type resd 1     ; Registry value type (DWORD)
+  reg_data resb 4     ; Registry value data buffer (DWORD)
+  reg_data_size resd 1 ; Size of the reg_data buffer (in/out parameter)
+
+section .text
+  global _start
+
+_start:
+  ; Call the RegOpenKeyEx function to open the registry key
+  ; RegOpenKeyEx(hKey, lpSubKey, ulOptions, samDesired, phkResult) -> eax = error code
+  xor eax, eax               ; Clear eax before use
+  mov eax, 0x80000002        ; HKEY_LOCAL_MACHINE (0x80000002) registry root
+  lea ebx, [reg_key]        ; Load the address of the registry key
+  xor ecx, ecx              ; lpReserved must be NULL (0)
+  mov edx, 0x20019          ; KEY_READ (0x20019) access rights
+  int 0x80                  ; syscall
+
+  ; Check if the function call was successful (eax = 0)
+  test eax, eax
+  jnz not_installed         ; If there was an error, PowerShell is not installed
+
+  ; Save the handle to the opened registry key
+  mov [hkey], eax
+
+  ; Call the RegQueryValueEx function to get the value data
+  ; RegQueryValueEx(hKey, lpValueName, lpReserved, lpType, lpData, lpcbData) -> eax = error code
+  xor eax, eax               ; Clear eax before use
+  mov eax, [hkey]           ; Load the handle to the opened registry key
+  lea ebx, [reg_value]      ; Load the address of the registry value name
+  xor ecx, ecx              ; lpReserved must be NULL (0)
+  lea edx, [reg_data]       ; Load the address of the reg_data buffer
+  mov esi, 4                ; Size of reg_data buffer (DWORD size)
+  lea edi, [reg_data_size]  ; Load the address of the reg_data_size variable
+  int 0x80                  ; syscall
+
+  ; Check if the function call was successful (eax = 0)
+  test eax, eax
+  jnz not_installed         ; If there was an error, PowerShell is not installed
+
+  ; Check if the registry value data is not equal to 0 (indicating PowerShell is installed)
+  cmp dword [reg_data], 0
+  je not_installed          ; If the data is 0, PowerShell is not installed
+
+  ; If we reach here, PowerShell is installed
+  ; You can add code here to handle the case when PowerShell is installed
+
+  ; Close the registry key handle
+  ; RegCloseKey(hKey) -> eax = error code
+  xor eax, eax              ; Clear eax before use
+  mov eax, [hkey]          ; Load the handle to the opened registry key
+  int 0x80                  ; syscall
+
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax              ; Zero out eax
+  int 0x80                  ; syscall
+
+not_installed:
+  ; PowerShell is not installed
+  ; You can add code here to handle the case when PowerShell is not installed
+
+  ; Close the registry key handle if it was opened
+  test dword [hkey], [hkey] ; Check if hkey contains a valid handle
+  jz exit_program          ; If it's not a valid handle, jump to exit
+
+  ; RegCloseKey(hKey) -> eax = error code
+  xor eax, eax              ; Clear eax before use
+  mov eax, [hkey]          ; Load the handle to the opened registry key
+  int 0x80                  ; syscall
+
+exit_program:
+  ; Exit the program
+  ; exit(return_code) -> eax = 0 (successful_exit)
+  xor eax, eax              ; Zero out eax
+  int 0x80                  ; syscall

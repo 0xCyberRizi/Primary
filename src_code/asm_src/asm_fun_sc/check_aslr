@@ -1,0 +1,69 @@
+;nasm -f win32 check_aslr.asm
+;Link the object file with GCC:
+;gcc -m32 -o check_aslr.exe check_aslr.obj
+;Run the resulting executable:
+;check_aslr.exe
+
+section .data
+  caption db "ASLR Status",0          ; Null-terminated caption for the message box
+  enabled db "ASLR is enabled.",0     ; Null-terminated message for enabled status
+  disabled db "ASLR is disabled.",0   ; Null-terminated message for disabled status
+
+section .bss
+  mitigationPolicy resq 1             ; Buffer to store the PROCESS_MITIGATION_POLICY structure
+
+section .text
+  extern GetProcessMitigationPolicy@16, MessageBoxA@16, ExitProcess@4
+
+global _start
+
+_start:
+  ; Set up the PROCESS_MITIGATION_POLICY structure
+  mov qword [mitigationPolicy], 0x2   ; ProcessASLRPolicy - offset 2 indicates ASLR status
+
+  ; Call GetProcessMitigationPolicy to retrieve the ASLR status
+  push 16                            ; Size of the PROCESS_MITIGATION_POLICY structure
+  push mitigationPolicy              ; Pointer to the structure
+  call GetProcessMitigationPolicy@16 ; Call the function
+  add esp, 8                         ; Clean up the stack after the call (16 bytes were pushed)
+
+  ; Check the return value (EAX) for success (non-zero) or failure (zero)
+  test eax, eax
+  jz error_handler                   ; If EAX is zero, an error occurred; jump to the error_handler
+
+  ; Check the ProcessASLRPolicy flag (bit 1) to determine if ASLR is enabled
+  test byte [mitigationPolicy], 2
+  jz aslr_disabled                   ; If bit 1 is zero, jump to the aslr_disabled label (ASLR is disabled)
+
+  ; ASLR is enabled, show the message box
+  push 0                             ; Set uType to 0 (MB_OK)
+  push enabled                       ; Pointer to the message
+  push caption                       ; Pointer to the caption
+  push 0                             ; Parent window handle (0 for no parent)
+  call MessageBoxA@16                ; Call the MessageBoxA function
+  add esp, 16                        ; Clean up the stack after the call (16 bytes were pushed)
+  jmp end                            ; Jump to the end of the program
+
+aslr_disabled:
+  ; ASLR is disabled, show the message box
+  push 0                             ; Set uType to 0 (MB_OK)
+  push disabled                      ; Pointer to the message
+  push caption                       ; Pointer to the caption
+  push 0                             ; Parent window handle (0 for no parent)
+  call MessageBoxA@16                ; Call the MessageBoxA function
+  add esp, 16                        ; Clean up the stack after the call (16 bytes were pushed)
+  jmp end                            ; Jump to the end of the program
+
+error_handler:
+  ; Error occurred while retrieving ASLR status, show the message box
+  push 0                             ; Set uType to 0 (MB_OK)
+  push "Error retrieving ASLR status." ; Pointer to the error message
+  push caption                       ; Pointer to the caption
+  push 0                             ; Parent window handle (0 for no parent)
+  call MessageBoxA@16                ; Call the MessageBoxA function
+  add esp, 16                        ; Clean up the stack after the call (16 bytes were pushed)
+
+end:
+  ; Exit the program
+  push 0                             ; Exit code 0
+  call ExitProcess@4                 ; Call the ExitProcess function

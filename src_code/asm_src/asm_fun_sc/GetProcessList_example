@@ -1,0 +1,86 @@
+;nasm -f win32 ListProcesses.asm
+;GoLink /entry _start ListProcesses.obj kernel32.dll user32.dll
+
+; ListProcesses.asm
+; Assemble using NASM: nasm -f win32 ListProcesses.asm
+; Link using GoLink (or any other suitable linker): GoLink /entry _start ListProcesses.obj kernel32.dll user32.dll
+
+section .data
+  proc_list_fmt db "%s", 10, 0      ; Format string to print process names with a newline
+  process_name rb 256              ; Buffer to store the process name
+
+section .bss
+  h_snapshot resd 1                ; Handle to the process snapshot
+  pe32 resb sizeof.PROCESSENTRY32  ; Structure to hold process entry information
+
+section .text
+  global _start
+
+extern CreateToolhelp32Snapshot, Process32First, Process32Next, printf, ExitProcess, CloseHandle
+extern Sleep
+
+_start:
+  ; Step 1: Create a snapshot of the process list
+  ; CreateToolhelp32Snapshot(flags, 0) -> eax = handle to the process snapshot
+  mov eax, 0x2                    ; TH32CS_SNAPPROCESS
+  xor ebx, ebx                    ; Process ID 0 (to get a snapshot of all processes)
+  call CreateToolhelp32Snapshot
+  test eax, eax
+  jz terminate                    ; If snapshot creation failed, terminate the program
+
+  ; Save the handle to the process snapshot
+  mov [h_snapshot], eax
+
+  ; Step 2: Get the first process entry
+  ; Process32First(hSnapshot, lppe) -> eax = 0 if failed, 1 if succeeded
+  mov edx, sizeof.PROCESSENTRY32  ; Size of the structure PROCESSENTRY32
+  lea ecx, [pe32]                 ; Address of the PROCESSENTRY32 structure
+  push ecx                        ; lppe (pointer to the PROCESSENTRY32 structure)
+  push dword [h_snapshot]         ; hSnapshot (handle to the process snapshot)
+  call Process32First
+  test eax, eax
+  jz terminate                    ; If Process32First failed, terminate the program
+
+  ; Loop through the list of processes and print their names to the console
+print_processes_loop:
+  ; Get the name of the current process
+  mov eax, [pe32 + PROCESSENTRY32.szExeFile] ; Offset to the process name in the structure
+  push eax                        ; Push the address of the process name
+  push dword proc_list_fmt        ; Push the format string
+  call printf
+  add esp, 8                      ; Clean up the stack
+
+  ; Move to the next process in the list
+  ; Process32Next(hSnapshot, lppe) -> eax = 0 if failed, 1 if succeeded
+  mov edx, sizeof.PROCESSENTRY32  ; Size of the structure PROCESSENTRY32
+  lea ecx, [pe32]                 ; Address of the PROCESSENTRY32 structure
+  push ecx                        ; lppe (pointer to the PROCESSENTRY32 structure)
+  push dword [h_snapshot]         ; hSnapshot (handle to the process snapshot)
+  call Process32Next
+  test eax, eax
+  jnz print_processes_loop        ; If Process32Next succeeded, repeat the loop
+
+terminate:
+  ; Clean up resources and exit the program
+  push 0
+  call CloseHandle                ; Close the handle to the process snapshot
+
+  ; Exit the program
+  xor eax, eax                    ; Zero out eax (exit code 0)
+  call ExitProcess
+
+; Structures
+sizeof.PROCESSENTRY32 equ 0x000000E0 ; Size of PROCESSENTRY32 structure
+
+section .idata import data readable
+  library kernel32, 'KERNEL32.DLL', \
+          user32, 'USER32.DLL'
+  import kernel32, \
+         CreateToolhelp32Snapshot, 'CreateToolhelp32Snapshot', \
+         Process32First, 'Process32First', \
+         Process32Next, 'Process32Next', \
+         CloseHandle, 'CloseHandle', \
+         Sleep, 'Sleep'
+  import user32, \
+         printf, 'printf', \
+         ExitProcess, 'ExitProcess'
