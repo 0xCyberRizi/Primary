@@ -1,8 +1,3 @@
-# Creator: Anthony Rizi
-# Class csc842: Security Tool Development
-# Professor: Dr. Welu
-# Date 6/25/23
-# Cycle 6
 # python v3.8 scripting called Draupnir for Odin's Mythological Ring
 #possible cell tower information:
 #https://antennasearch.com
