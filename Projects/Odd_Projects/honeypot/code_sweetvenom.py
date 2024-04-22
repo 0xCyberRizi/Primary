@@ -2,9 +2,6 @@
 # -*- coding: utf-8 -*-
 #title           : sweetvenom honeypot
 #description     : Program created to simulate honeypots 
-#author          : Anthony Rizi
-#Course:         : CSC842 lab01
-#date            : 5/28/2023
 #version         :0.1
 #usage           :
 #notes           : 
